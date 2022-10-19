@@ -1,11 +1,9 @@
 package com.kaliv.application;
 
-import com.kaliv.ORM;
+import com.kaliv.mapper.ORM;
 import com.kaliv.entity.Philosopher;
-import com.kaliv.utils.PackageScanner;
 
 import java.util.List;
-import java.util.Set;
 
 @SuppressWarnings("all")
 public class Main {

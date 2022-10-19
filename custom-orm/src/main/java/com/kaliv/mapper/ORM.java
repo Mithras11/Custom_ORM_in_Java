@@ -1,4 +1,4 @@
-package com.kaliv;
+package com.kaliv.mapper;
 
 import com.kaliv.annotation.Column;
 import com.kaliv.annotation.PrimaryKey;
