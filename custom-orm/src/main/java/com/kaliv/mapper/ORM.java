@@ -58,12 +58,14 @@ public class ORM<T> {
                     String columnName = field.getAnnotation(Column.class).name();
                     String isNullable = field.getAnnotation(Column.class).nullable() ? "" : "not null";
 
-                    //TODO: add boolean and other types
+                    //TODO: add other types
                     String columnType = null;
                     if (field.getType() == String.class) {
                         columnType = String.format("varchar(%d)", field.getAnnotation(Column.class).length());
                     } else if (field.getType() == int.class) {
                         columnType = int.class.getName();
+                    } else if (field.getType() == boolean.class) {
+                        columnType = "bit";
                     }
                     String col = String.format("%s %s %s",
                             columnName,
@@ -133,6 +135,42 @@ public class ORM<T> {
                 statement.setString(index++, (String) field.get(t));
             }
         }
+        statement.executeUpdate();
+    }
+
+    public void update(T t, int id) throws Exception {
+        Class<?> cls = t.getClass();
+        Field[] declaredFields = cls.getDeclaredFields();
+
+        Field primaryKey = null;
+        StringJoiner joiner = new StringJoiner(", ");
+        for (Field field : declaredFields) {
+            field.setAccessible(true);
+            if (field.isAnnotationPresent(Id.class)) {
+                primaryKey = field;
+            } else if (field.isAnnotationPresent(Column.class)) {
+                String col = null;
+                if (field.getType() == String.class) {
+                    col = String.format("%s = '%s'",
+                            field.getAnnotation(Column.class).name(), field.get(t));
+                } else if (field.getType() == int.class) {
+                    col = String.format("%s = %d",
+                            field.getAnnotation(Column.class).name(), (int) field.get(t));
+                } else if (field.getType() == boolean.class) {
+                    col = String.format("%s = %d",
+                            field.getAnnotation(Column.class).name(), (boolean) field.get(t) ? 1 : 0);
+                }
+                joiner.add(col);
+            }
+        }
+
+        String sql = String.format("update %s set %s where %s = %d",
+                cls.getAnnotation(Table.class).name(),
+                joiner,
+                Objects.requireNonNull(primaryKey).getName(),
+                id);
+
+        PreparedStatement statement = connection.prepareStatement(sql);
         statement.executeUpdate();
     }
 

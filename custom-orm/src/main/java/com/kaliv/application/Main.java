@@ -30,6 +30,13 @@ public class Main {
         System.out.println(socrates_from_db);
         System.out.println("=============");
 
+        aristotle.setSchool("Stagira");
+        orm.update(aristotle, 3);
+
+        Philosopher updated_aristotle_from_db = (Philosopher) orm.read(Philosopher.class, 3);
+        System.out.println(updated_aristotle_from_db);
+        System.out.println("=============");
+
         List<Philosopher> result = (List<Philosopher>) (List<?>) orm.readAll(Philosopher.class);
         result.stream().forEach(e -> System.out.println(e));
         System.out.println("=============");
