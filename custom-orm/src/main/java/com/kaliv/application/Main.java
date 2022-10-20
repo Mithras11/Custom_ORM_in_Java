@@ -26,8 +26,8 @@ public class Main {
         orm.write(aristotle);
         orm.write(pythagoras);
 
-        Philosopher socrates_from_db = (Philosopher) orm.read(Philosopher.class, 1);
-        System.out.println(socrates_from_db);
+        Philosopher aristotle_from_db = (Philosopher) orm.read(Philosopher.class, 3);
+        System.out.println(aristotle_from_db);
         System.out.println("=============");
 
         aristotle.setSchool("Stagira");

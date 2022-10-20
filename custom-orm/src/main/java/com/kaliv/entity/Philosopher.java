@@ -14,7 +14,7 @@ public class Philosopher {
     @Column(name = "name", length = 50, nullable = false)
     private String name;
 
-    @Column(name = "nationality", length = 30, nullable = true)
+    @Column(name = "nationality", length = 20, nullable = true)
     private String nationality;
 
     @Column(name = "school_of_thought", length = 30, nullable = false)

@@ -3,9 +3,11 @@ package com.kaliv.mapper;
 import com.kaliv.annotation.Column;
 import com.kaliv.annotation.Id;
 import com.kaliv.annotation.Table;
+import com.kaliv.utils.Constants;
 import com.mysql.cj.jdbc.MysqlDataSource;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.sql.*;
 import java.util.*;
@@ -23,21 +25,7 @@ public class ORM<T> {
     }
 
     private ORM() throws Exception {
-        String rootPath = Objects.requireNonNull(
-                Thread.currentThread().getContextClassLoader().getResource("")).getPath();
-        String dbConfigPath = rootPath + "db.properties";
-        Properties dbProps = new Properties();
-        dbProps.load(new FileInputStream(dbConfigPath));
-
-        String url = dbProps.getProperty("url");
-        String username = dbProps.getProperty("username");
-        String password = dbProps.getProperty("password");
-
-        MysqlDataSource dataSource = new MysqlDataSource();
-        dataSource.setUser(username);
-        dataSource.setPassword(password);
-        dataSource.setUrl(url);
-
+        MysqlDataSource dataSource = getDataSource();
         this.connection = dataSource.getConnection();
     }
 
@@ -51,23 +39,23 @@ public class ORM<T> {
                     .orElseThrow();
             String pKeyType = primaryKey.getType().getName();
 
-            StringJoiner joiner = new StringJoiner(", ");
+            StringJoiner joiner = new StringJoiner(Constants.DELIMITER);
 
             for (Field field : declaredFields) {
                 if (field.isAnnotationPresent(Column.class)) {
                     String columnName = field.getAnnotation(Column.class).name();
-                    String isNullable = field.getAnnotation(Column.class).nullable() ? "" : "not null";
+                    String isNullable = field.getAnnotation(Column.class).nullable() ? "" : Constants.NOT_NULL;
 
                     //TODO: add other types
                     String columnType = null;
                     if (field.getType() == String.class) {
-                        columnType = String.format("varchar(%d)", field.getAnnotation(Column.class).length());
+                        columnType = String.format(Constants.VARCHAR, field.getAnnotation(Column.class).length());
                     } else if (field.getType() == int.class) {
                         columnType = int.class.getName();
                     } else if (field.getType() == boolean.class) {
-                        columnType = "bit";
+                        columnType = Constants.BIT;
                     }
-                    String col = String.format("%s %s %s",
+                    String col = String.format(Constants.COL_VALUES,
                             columnName,
                             columnType,
                             isNullable);
@@ -75,7 +63,7 @@ public class ORM<T> {
                 }
             }
 
-            String sql = String.format("create table if not exists %s (id %s not null, %s)",
+            String sql = String.format(Constants.CREATE_TABLE_QUERY,
                     tableName, pKeyType, joiner);
 
             PreparedStatement statement = connection.prepareStatement(sql);
@@ -86,7 +74,7 @@ public class ORM<T> {
     public void dropTable(T t) throws SQLException {
         Class<?> cls = (Class<?>) t;
         String tableName = cls.getAnnotation(Table.class).name();
-        String sql = String.format("drop table if exists %s", tableName);
+        String sql = String.format(Constants.DROP_TABLE_QUERY, tableName);
         PreparedStatement statement = connection.prepareStatement(sql);
         statement.executeUpdate();
     }
@@ -97,7 +85,7 @@ public class ORM<T> {
 
         Field primaryKey = null;
         ArrayList<Field> columns = new ArrayList<>();
-        StringJoiner joiner = new StringJoiner(", ");
+        StringJoiner joiner = new StringJoiner(Constants.DELIMITER);
 
         for (Field field : declaredFields) {
             if (field.isAnnotationPresent(Id.class)) {
@@ -112,9 +100,9 @@ public class ORM<T> {
         int size = columns.size() + 1;
         String qMarks = IntStream.range(0, size)
                 .mapToObj(e -> "?")
-                .collect(Collectors.joining(", "));
+                .collect(Collectors.joining(Constants.DELIMITER));
 
-        String sql = String.format("insert into %s (%s, %s) values (%s)",
+        String sql = String.format(Constants.INSERT_QUERY,
                 cls.getAnnotation(Table.class).name(),
                 Objects.requireNonNull(primaryKey).getName(),
                 joiner,
@@ -143,7 +131,7 @@ public class ORM<T> {
         Field[] declaredFields = cls.getDeclaredFields();
 
         Field primaryKey = null;
-        StringJoiner joiner = new StringJoiner(", ");
+        StringJoiner joiner = new StringJoiner(Constants.DELIMITER);
         for (Field field : declaredFields) {
             field.setAccessible(true);
             if (field.isAnnotationPresent(Id.class)) {
@@ -151,20 +139,20 @@ public class ORM<T> {
             } else if (field.isAnnotationPresent(Column.class)) {
                 String col = null;
                 if (field.getType() == String.class) {
-                    col = String.format("%s = '%s'",
+                    col = String.format(Constants.STRING_VALUE,
                             field.getAnnotation(Column.class).name(), field.get(t));
                 } else if (field.getType() == int.class) {
-                    col = String.format("%s = %d",
+                    col = String.format(Constants.NUMERIC_VALUE,
                             field.getAnnotation(Column.class).name(), (int) field.get(t));
                 } else if (field.getType() == boolean.class) {
-                    col = String.format("%s = %d",
+                    col = String.format(Constants.NUMERIC_VALUE,
                             field.getAnnotation(Column.class).name(), (boolean) field.get(t) ? 1 : 0);
                 }
                 joiner.add(col);
             }
         }
 
-        String sql = String.format("update %s set %s where %s = %d",
+        String sql = String.format(Constants.UPDATE_QUERY,
                 cls.getAnnotation(Table.class).name(),
                 joiner,
                 Objects.requireNonNull(primaryKey).getName(),
@@ -183,7 +171,7 @@ public class ORM<T> {
                 .orElseThrow();
 
         String tableName = cls.getAnnotation(Table.class).name();
-        String sql = String.format("select * from %s where %s = %d",
+        String sql = String.format(Constants.SELECT_QUERY,
                 tableName, primaryKey.getName(), id);
 
         PreparedStatement stmt = connection.prepareStatement(sql);
@@ -202,7 +190,7 @@ public class ORM<T> {
                 .orElseThrow();
 
         String tableName = cls.getAnnotation(Table.class).name();
-        String sql = String.format("select * from %s", tableName);
+        String sql = String.format(Constants.SELECT_ALL_QUERY, tableName);
 
         PreparedStatement stmt = connection.prepareStatement(sql);
 
@@ -227,7 +215,7 @@ public class ORM<T> {
                 .orElseThrow();
 
         String tableName = cls.getAnnotation(Table.class).name();
-        String sql = String.format("delete from %s where %s = %d",
+        String sql = String.format(Constants.DELETE_QUERY,
                 tableName, primaryKey.getName(), l);
 
         PreparedStatement stmt = connection.prepareStatement(sql);
@@ -257,4 +245,23 @@ public class ORM<T> {
         }
         return t;
     }
+
+    private static MysqlDataSource getDataSource() throws IOException {
+        String rootPath = Objects.requireNonNull(
+                Thread.currentThread().getContextClassLoader().getResource("")).getPath();
+        String dbConfigPath = rootPath + Constants.PROPS;
+        Properties dbProps = new Properties();
+        dbProps.load(new FileInputStream(dbConfigPath));
+
+        String url = dbProps.getProperty(Constants.URL);
+        String username = dbProps.getProperty(Constants.USER);
+        String password = dbProps.getProperty(Constants.PASS);
+
+        MysqlDataSource dataSource = new MysqlDataSource();
+        dataSource.setUser(username);
+        dataSource.setPassword(password);
+        dataSource.setUrl(url);
+        return dataSource;
+    }
+
 }
