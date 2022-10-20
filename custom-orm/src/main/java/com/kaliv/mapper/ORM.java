@@ -206,7 +206,7 @@ public class ORM<T> {
         return tList;
     }
 
-    public void delete(T t, long l) throws Exception {
+    public void delete(T t, int l) throws Exception {
         Class<?> cls = (Class<?>) t;
         Field[] declaredFields = cls.getDeclaredFields();
         Field primaryKey = Arrays.stream(declaredFields)
