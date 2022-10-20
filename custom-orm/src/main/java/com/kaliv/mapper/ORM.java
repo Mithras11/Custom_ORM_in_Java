@@ -41,7 +41,6 @@ public class ORM<T> {
         this.connection = dataSource.getConnection();
     }
 
-    //TODO
     public void createTable(Set<Class<?>> classes) throws SQLException {
         for (Class<?> cls : classes) {
             String tableName = cls.getAnnotation(Table.class).name();
@@ -114,7 +113,10 @@ public class ORM<T> {
                 .collect(Collectors.joining(", "));
 
         String sql = String.format("insert into %s (%s, %s) values (%s)",
-                cls.getAnnotation(Table.class).name(), Objects.requireNonNull(primaryKey).getName(), joiner, qMarks);
+                cls.getAnnotation(Table.class).name(),
+                Objects.requireNonNull(primaryKey).getName(),
+                joiner,
+                qMarks);
 
         PreparedStatement statement = connection.prepareStatement(sql);
 
