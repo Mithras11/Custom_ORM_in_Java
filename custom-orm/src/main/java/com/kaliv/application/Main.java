@@ -1,9 +1,14 @@
 package com.kaliv.application;
 
+import com.kaliv.annotation.Entity;
 import com.kaliv.mapper.ORM;
 import com.kaliv.entity.Philosopher;
+import com.kaliv.utils.PackageScanner;
+import org.reflections.Reflections;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 @SuppressWarnings("all")
 public class Main {
@@ -15,26 +20,28 @@ public class Main {
 
         ORM<Object> orm = ORM.getConnection();
 
-//        PackageScanner scanner = new PackageScanner();
-////        Set<Class<?>> classes = scanner.findAllClassesUsingGoogleGuice(
-////                "com.kaliv.entity");
+        PackageScanner scanner = new PackageScanner();
+        Set<Class<?>> classes = scanner.findClasses("com.kaliv.entity");
+        orm.createTable(classes);
+
+//        orm.write(socrates);
+//        orm.write(plato);
+//        orm.write(aristotle);
+//        orm.write(pythagoras);
 //
-        orm.write(socrates);
-        orm.write(plato);
-        orm.write(aristotle);
-        orm.write(pythagoras);
-
-        Philosopher socrates_from_db =
-                (Philosopher) orm.read(Philosopher.class.getSimpleName(), 1L);
-        System.out.println(socrates_from_db);
-        System.out.println("=============");
-
-        List<Philosopher> result = (List<Philosopher>) (List<?>) orm.readAll(Philosopher.class.getSimpleName());
-        result.stream().forEach(e -> System.out.println(e));
-        System.out.println("=============");
-
-        orm.delete(Philosopher.class.getSimpleName(), 1L);
-        List<Philosopher> updatedRsult = (List<Philosopher>) (List<?>) orm.readAll(Philosopher.class.getSimpleName());
-        updatedRsult.stream().forEach(e -> System.out.println(e));
+//        Philosopher socrates_from_db =
+//                (Philosopher) orm.read(Philosopher.class.getSimpleName(), 1L);
+//        System.out.println(socrates_from_db);
+//        System.out.println("=============");
+//
+//        List<Philosopher> result = (List<Philosopher>) (List<?>) orm.readAll(Philosopher.class.getSimpleName());
+//        result.stream().forEach(e -> System.out.println(e));
+//        System.out.println("=============");
+//
+//        orm.delete(Philosopher.class.getSimpleName(), 1L);
+//        List<Philosopher> updatedRsult = (List<Philosopher>) (List<?>) orm.readAll(Philosopher.class.getSimpleName());
+//        updatedRsult.stream().forEach(e -> System.out.println(e));
+//
+        orm.dropTable(Philosopher.class);
     }
 }

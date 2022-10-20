@@ -1,12 +1,15 @@
 package com.kaliv.entity;
 
 import com.kaliv.annotation.Column;
+import com.kaliv.annotation.Entity;
 import com.kaliv.annotation.PrimaryKey;
+import com.kaliv.annotation.Table;
 
-
+@Entity
+@Table(name = "philosophers")
 public class Philosopher {
     @PrimaryKey
-    private long id;
+    private int id;
 
     @Column
     private String name;
@@ -26,11 +29,11 @@ public class Philosopher {
     public Philosopher() {
     }
 
-    public long getId() {
+    public int getId() {
         return id;
     }
 
-    public void setId(long id) {
+    public void setId(int id) {
         this.id = id;
     }
 

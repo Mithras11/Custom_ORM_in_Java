@@ -2,6 +2,7 @@ package com.kaliv.mapper;
 
 import com.kaliv.annotation.Column;
 import com.kaliv.annotation.PrimaryKey;
+import com.kaliv.annotation.Table;
 import com.mysql.cj.jdbc.MysqlDataSource;
 
 import java.io.FileInputStream;
@@ -43,8 +44,30 @@ public class ORM<T> {
         this.connection = dataSource.getConnection();
     }
 
-    public void createTable(Set<T> classes) {
+    //TODO
+    public void createTable(Set<Class<?>> classes) throws SQLException {
+        for (Class<?> cls : classes) {
+            String tableName = cls.getAnnotation(Table.class).name();
+            Field[] declaredFields = cls.getDeclaredFields();
+            Field primaryKey = Arrays.stream(declaredFields)
+                    .filter(f -> f.isAnnotationPresent(PrimaryKey.class))
+                    .findFirst()
+                    .orElseThrow();
+            String pKeyType = primaryKey.getType().getName();
 
+            String sql = String.format("create table if not exists %s (id %s not null)",
+                    tableName, pKeyType);
+
+            PreparedStatement statement = connection.prepareStatement(sql);
+            statement.executeUpdate();
+        }
+    }
+
+    public void dropTable(Class<?> cls) throws SQLException {
+        String tableName = cls.getAnnotation(Table.class).name();
+        String sql = String.format("drop table if exists %s", tableName);
+        PreparedStatement statement = connection.prepareStatement(sql);
+        statement.executeUpdate();
     }
 
     public void write(T t) throws Exception {

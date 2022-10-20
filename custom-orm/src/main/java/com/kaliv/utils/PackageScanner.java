@@ -1,19 +1,22 @@
 package com.kaliv.utils;
 
-import com.google.common.reflect.ClassPath;
+import com.kaliv.annotation.Entity;
+import com.kaliv.annotation.Table;
+import org.reflections.Reflections;
 
-import java.io.IOException;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class PackageScanner {
-    public Set<Class<?>> findAllClassesUsingGoogleGuice(String packageName) throws IOException {
-        return ClassPath.from(ClassLoader.getSystemClassLoader())
-                .getAllClasses()
-                .stream()
-                .filter(cls -> cls.getPackageName()
-                        .equalsIgnoreCase(packageName))
-                .map(ClassPath.ClassInfo::load)
-                .collect(Collectors.toSet());
+    public Set<Class<?>> findClasses(String packageName) {
+        Reflections reflections = new Reflections(packageName);
+        Set<Class<?>> classes = reflections.getTypesAnnotatedWith(Entity.class);
+
+//        List<String> tableNames = classes.stream()
+//                .map(cls -> cls.getAnnotation(Table.class).name())
+//                .collect(Collectors.toList());
+
+        return classes;
     }
 }
