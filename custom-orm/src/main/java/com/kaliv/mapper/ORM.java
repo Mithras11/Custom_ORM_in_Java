@@ -1,7 +1,7 @@
 package com.kaliv.mapper;
 
 import com.kaliv.annotation.Column;
-import com.kaliv.annotation.PrimaryKey;
+import com.kaliv.annotation.Id;
 import com.kaliv.annotation.Table;
 import com.mysql.cj.jdbc.MysqlDataSource;
 
@@ -9,14 +9,14 @@ import java.io.FileInputStream;
 import java.lang.reflect.Field;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class ORM<T> {
     private final Connection connection;
 
-    private AtomicLong id = new AtomicLong(0L);
+    private AtomicInteger id = new AtomicInteger(0);
 
     public static <T> ORM<T> getConnection() throws Exception {
         return new ORM<>();
@@ -50,20 +50,43 @@ public class ORM<T> {
             String tableName = cls.getAnnotation(Table.class).name();
             Field[] declaredFields = cls.getDeclaredFields();
             Field primaryKey = Arrays.stream(declaredFields)
-                    .filter(f -> f.isAnnotationPresent(PrimaryKey.class))
+                    .filter(f -> f.isAnnotationPresent(Id.class))
                     .findFirst()
                     .orElseThrow();
             String pKeyType = primaryKey.getType().getName();
 
-            String sql = String.format("create table if not exists %s (id %s not null)",
-                    tableName, pKeyType);
+            StringJoiner joiner = new StringJoiner(", ");
+
+            for (Field field : declaredFields) {
+                if (field.isAnnotationPresent(Column.class)) {
+                    String columnName = field.getAnnotation(Column.class).name();
+                    String isNullable = field.getAnnotation(Column.class).nullable() ? "" : "not null";
+
+                    //TODO: add boolean and other types
+                    String columnType = null;
+                    if (field.getType() == String.class) {
+                        columnType = String.format("varchar(%d)", field.getAnnotation(Column.class).length());
+                    } else if (field.getType() == int.class) {
+                        columnType = int.class.getName();
+                    }
+                    String col = String.format("%s %s %s",
+                            columnName,
+                            columnType,
+                            isNullable);
+                    joiner.add(col);
+                }
+            }
+
+            String sql = String.format("create table if not exists %s (id %s not null, %s)",
+                    tableName, pKeyType, joiner);
 
             PreparedStatement statement = connection.prepareStatement(sql);
             statement.executeUpdate();
         }
     }
 
-    public void dropTable(Class<?> cls) throws SQLException {
+    public void dropTable(T t) throws SQLException {
+        Class<?> cls = (Class<?>) t;
         String tableName = cls.getAnnotation(Table.class).name();
         String sql = String.format("drop table if exists %s", tableName);
         PreparedStatement statement = connection.prepareStatement(sql);
@@ -79,12 +102,12 @@ public class ORM<T> {
         StringJoiner joiner = new StringJoiner(", ");
 
         for (Field field : declaredFields) {
-            if (field.isAnnotationPresent(PrimaryKey.class)) {
+            if (field.isAnnotationPresent(Id.class)) {
                 primaryKey = field;
 
             } else if (field.isAnnotationPresent(Column.class)) {
                 columns.add(field);
-                joiner.add(field.getName());
+                joiner.add(field.getAnnotation(Column.class).name());
             }
         }
 
@@ -94,13 +117,13 @@ public class ORM<T> {
                 .collect(Collectors.joining(", "));
 
         String sql = String.format("insert into %s (%s, %s) values (%s)",
-                cls.getSimpleName(), Objects.requireNonNull(primaryKey).getName(), joiner, qMarks);
+                cls.getAnnotation(Table.class).name(), Objects.requireNonNull(primaryKey).getName(), joiner, qMarks);
 
         PreparedStatement statement = connection.prepareStatement(sql);
 
         int index = 1;
-        if (primaryKey.getType() == long.class) {
-            statement.setLong(index++, id.incrementAndGet());
+        if (primaryKey.getType() == int.class) {
+            statement.setInt(index++, id.incrementAndGet());
         }
 
         for (Field field : columns) {
@@ -114,33 +137,35 @@ public class ORM<T> {
         statement.executeUpdate();
     }
 
-    public T read(String className, long l) throws Exception {
-        Class<?> tClass = Class.forName(String.format("com.kaliv.entity.%s", className));
-        Field[] declaredFields = tClass.getDeclaredFields();
+    public T read(T t, int id) throws Exception {
+        Class<?> cls = (Class<?>) t;
+        Field[] declaredFields = cls.getDeclaredFields();
         Field primaryKey = Arrays.stream(declaredFields)
-                .filter(f -> f.isAnnotationPresent(PrimaryKey.class))
+                .filter(f -> f.isAnnotationPresent(Id.class))
                 .findFirst()
                 .orElseThrow();
 
+        String tableName = cls.getAnnotation(Table.class).name();
         String sql = String.format("select * from %s where %s = %d",
-                tClass.getSimpleName(), primaryKey.getName(), l);
+                tableName, primaryKey.getName(), id);
 
         PreparedStatement stmt = connection.prepareStatement(sql);
         ResultSet rs = stmt.executeQuery();
         rs.next();
 
-        return readEntityFromDb(tClass, declaredFields, primaryKey, rs);
+        return readEntityFromDb(cls, declaredFields, primaryKey, rs);
     }
 
-    public List<T> readAll(String className) throws Exception {
-        Class<?> tClass = Class.forName(String.format("com.kaliv.entity.%s", className));
-        Field[] declaredFields = tClass.getDeclaredFields();
+    public List<T> readAll(T t) throws Exception {
+        Class<?> cls = (Class<?>) t;
+        Field[] declaredFields = cls.getDeclaredFields();
         Field primaryKey = Arrays.stream(declaredFields)
-                .filter(f -> f.isAnnotationPresent(PrimaryKey.class))
+                .filter(f -> f.isAnnotationPresent(Id.class))
                 .findFirst()
                 .orElseThrow();
 
-        String sql = String.format("select * from %s", tClass.getSimpleName());
+        String tableName = cls.getAnnotation(Table.class).name();
+        String sql = String.format("select * from %s", tableName);
 
         PreparedStatement stmt = connection.prepareStatement(sql);
 
@@ -149,23 +174,24 @@ public class ORM<T> {
 
         List<T> tList = new ArrayList<>();
         while (!rs.isAfterLast()) {
-            T t = readEntityFromDb(tClass, declaredFields, primaryKey, rs);
-            tList.add(t);
+            T entity = readEntityFromDb(cls, declaredFields, primaryKey, rs);
+            tList.add(entity);
             rs.next();
         }
         return tList;
     }
 
-    public void delete(String className, long l) throws Exception {
-        Class<?> tClass = Class.forName(String.format("com.kaliv.entity.%s", className));
-        Field[] declaredFields = tClass.getDeclaredFields();
+    public void delete(T t, long l) throws Exception {
+        Class<?> cls = (Class<?>) t;
+        Field[] declaredFields = cls.getDeclaredFields();
         Field primaryKey = Arrays.stream(declaredFields)
-                .filter(f -> f.isAnnotationPresent(PrimaryKey.class))
+                .filter(f -> f.isAnnotationPresent(Id.class))
                 .findFirst()
                 .orElseThrow();
 
+        String tableName = cls.getAnnotation(Table.class).name();
         String sql = String.format("delete from %s where %s = %d",
-                tClass.getSimpleName(), primaryKey.getName(), l);
+                tableName, primaryKey.getName(), l);
 
         PreparedStatement stmt = connection.prepareStatement(sql);
         stmt.executeUpdate();
@@ -177,9 +203,9 @@ public class ORM<T> {
                                Field primaryKey,
                                ResultSet rs) throws Exception {
         T t = (T) tClass.getConstructor().newInstance();
-        long transactionId = rs.getInt(primaryKey.getName());
+        int id = rs.getInt(primaryKey.getName());
         primaryKey.setAccessible(true);
-        primaryKey.set(t, transactionId);
+        primaryKey.set(t, id);
 
         for (Field field : declaredFields) {
             if (field.isAnnotationPresent(Column.class)) {
@@ -188,7 +214,7 @@ public class ORM<T> {
                 if (field.getType() == int.class) {
                     field.set(t, rs.getInt(field.getName()));
                 } else if (field.getType() == String.class) {
-                    field.set(t, rs.getString(field.getName()));
+                    field.set(t, rs.getString(field.getAnnotation(Column.class).name()));
                 }
             }
         }

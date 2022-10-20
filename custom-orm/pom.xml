@@ -26,7 +26,6 @@
             <version>0.10.2</version>
         </dependency>
 
-        <!--        otherwise throws error when table is dropped??-->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-slf4j-impl</artifactId>
