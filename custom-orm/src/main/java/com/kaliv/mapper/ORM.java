@@ -23,11 +23,8 @@ public class ORM<T> {
     }
 
     private ORM() throws Exception {
-//        this.connection = DriverManager.getConnection(
-//                "jdbc:mysql://localhost:3306/custom_orm?useSSL=false&serverTimezone=UTC",
-//                "root", "Goedel.Escher.Bach");
-
-        String rootPath = Objects.requireNonNull(Thread.currentThread().getContextClassLoader().getResource("")).getPath();
+        String rootPath = Objects.requireNonNull(
+                Thread.currentThread().getContextClassLoader().getResource("")).getPath();
         String dbConfigPath = rootPath + "db.properties";
         Properties dbProps = new Properties();
         dbProps.load(new FileInputStream(dbConfigPath));
