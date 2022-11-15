@@ -45,6 +45,6 @@ public class Main {
         List<Philosopher> updatedRsult = (List<Philosopher>) (List<?>) orm.readAll(Philosopher.class);
         updatedRsult.stream().forEach(e -> System.out.println(e));
 
-        orm.dropTable(Philosopher.class);
+//        orm.dropTable(Philosopher.class);
     }
 }

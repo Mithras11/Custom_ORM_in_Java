@@ -17,6 +17,8 @@ import java.util.stream.IntStream;
 public class ORM<T> {
     private final Connection connection;
 
+    private final Map<String, Integer> primaryKeysInDb = new HashMap<>();
+
     public static <T> ORM<T> getConnection() throws Exception {
         return new ORM<>();
     }
@@ -108,9 +110,12 @@ public class ORM<T> {
         PreparedStatement statement = connection.prepareStatement(sql);
 
         int index = 1;
-        int pkFromDb = getPrimaryKeyFromDb(cls);
+        int pkInDb = getPrimaryKeyFromDb(cls);
+        String tableName = cls.getAnnotation(Table.class).name();
         if (primaryKey.getType() == int.class) {
-            statement.setInt(index++, pkFromDb + 1);
+            pkInDb++;
+            statement.setInt(index++, pkInDb);
+            primaryKeysInDb.put(tableName, pkInDb);
         }
 
         for (Field field : columns) {
@@ -246,7 +251,11 @@ public class ORM<T> {
 
     private int getPrimaryKeyFromDb(Class<?> cls) throws SQLException {
         String tableName = cls.getAnnotation(Table.class).name();
-        String sql = String.format("select max(id) from %s", tableName);
+        if (primaryKeysInDb.containsKey(tableName)) {
+            return primaryKeysInDb.get(tableName);
+        }
+
+        String sql = String.format(Constants.READ_LAST_PRIMARY_KEY_IN_DB, tableName);
         PreparedStatement getPrimaryKey = connection.prepareStatement(sql);
         ResultSet rs = getPrimaryKey.executeQuery();
         rs.next();
