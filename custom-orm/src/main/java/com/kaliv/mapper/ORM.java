@@ -11,14 +11,11 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class ORM<T> {
     private final Connection connection;
-
-    private AtomicInteger id = new AtomicInteger(0);
 
     public static <T> ORM<T> getConnection() throws Exception {
         return new ORM<>();
@@ -111,8 +108,9 @@ public class ORM<T> {
         PreparedStatement statement = connection.prepareStatement(sql);
 
         int index = 1;
+        int pkFromDb = getPrimaryKeyFromDb(cls);
         if (primaryKey.getType() == int.class) {
-            statement.setInt(index++, id.incrementAndGet());
+            statement.setInt(index++, pkFromDb + 1);
         }
 
         for (Field field : columns) {
@@ -244,6 +242,15 @@ public class ORM<T> {
             }
         }
         return t;
+    }
+
+    private int getPrimaryKeyFromDb(Class<?> cls) throws SQLException {
+        String tableName = cls.getAnnotation(Table.class).name();
+        String sql = String.format("select max(id) from %s", tableName);
+        PreparedStatement getPrimaryKey = connection.prepareStatement(sql);
+        ResultSet rs = getPrimaryKey.executeQuery();
+        rs.next();
+        return rs.getInt(1);
     }
 
     private static MysqlDataSource getDataSource() throws IOException {
