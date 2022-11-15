@@ -4,19 +4,23 @@ import com.kaliv.annotation.Column;
 import com.kaliv.annotation.Id;
 import com.kaliv.annotation.Table;
 import com.kaliv.utils.Constants;
+import com.kaliv.utils.Container;
 import com.mysql.cj.jdbc.MysqlDataSource;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+
 public class ORM<T> {
     private final Connection connection;
-
     private final Map<String, Integer> primaryKeysInDb = new HashMap<>();
 
     public static <T> ORM<T> getConnection() throws Exception {
@@ -30,22 +34,19 @@ public class ORM<T> {
 
     public void createTable(Set<Class<?>> classes) throws SQLException {
         for (Class<?> cls : classes) {
-            String tableName = cls.getAnnotation(Table.class).name();
-            Field[] declaredFields = cls.getDeclaredFields();
-            Field primaryKey = Arrays.stream(declaredFields)
-                    .filter(f -> f.isAnnotationPresent(Id.class))
-                    .findFirst()
-                    .orElseThrow();
+            Container classData = readClassData(cls);
+            Field[] declaredFields = classData.getDeclaredFields();
+            Field primaryKey = classData.getPrimaryKey();
+            String tableName = classData.getTableName();
             String pKeyType = primaryKey.getType().getName();
 
             StringJoiner joiner = new StringJoiner(Constants.DELIMITER);
-
             for (Field field : declaredFields) {
                 if (field.isAnnotationPresent(Column.class)) {
                     String columnName = field.getAnnotation(Column.class).name();
                     String isNullable = field.getAnnotation(Column.class).nullable() ? "" : Constants.NOT_NULL;
 
-                    //TODO: add other types
+                    //possible to add other types
                     String columnType = null;
                     if (field.getType() == String.class) {
                         columnType = String.format(Constants.VARCHAR, field.getAnnotation(Column.class).length());
@@ -85,7 +86,6 @@ public class ORM<T> {
         Field primaryKey = null;
         ArrayList<Field> columns = new ArrayList<>();
         StringJoiner joiner = new StringJoiner(Constants.DELIMITER);
-
         for (Field field : declaredFields) {
             if (field.isAnnotationPresent(Id.class)) {
                 primaryKey = field;
@@ -139,7 +139,9 @@ public class ORM<T> {
             field.setAccessible(true);
             if (field.isAnnotationPresent(Id.class)) {
                 primaryKey = field;
-            } else if (field.isAnnotationPresent(Column.class)) {
+                continue;
+            }
+            if (field.isAnnotationPresent(Column.class)) {
                 String col = null;
                 if (field.getType() == String.class) {
                     col = String.format(Constants.STRING_VALUE,
@@ -165,39 +167,31 @@ public class ORM<T> {
         statement.executeUpdate();
     }
 
-    public T read(T t, int id) throws Exception {
-        Class<?> cls = (Class<?>) t;
-        Field[] declaredFields = cls.getDeclaredFields();
-        Field primaryKey = Arrays.stream(declaredFields)
-                .filter(f -> f.isAnnotationPresent(Id.class))
-                .findFirst()
-                .orElseThrow();
+    public T read(Class<?> cls, int id) throws Exception {
+        Container classData = readClassData(cls);
+        Field[] declaredFields = classData.getDeclaredFields();
+        Field primaryKey = classData.getPrimaryKey();
+        String tableName = classData.getTableName();
 
-        String tableName = cls.getAnnotation(Table.class).name();
         String sql = String.format(Constants.SELECT_QUERY,
                 tableName, primaryKey.getName(), id);
 
-        PreparedStatement stmt = connection.prepareStatement(sql);
-        ResultSet rs = stmt.executeQuery();
+        PreparedStatement statement = connection.prepareStatement(sql);
+        ResultSet rs = statement.executeQuery();
         rs.next();
 
         return readEntityFromDb(cls, declaredFields, primaryKey, rs);
     }
 
-    public List<T> readAll(T t) throws Exception {
-        Class<?> cls = (Class<?>) t;
-        Field[] declaredFields = cls.getDeclaredFields();
-        Field primaryKey = Arrays.stream(declaredFields)
-                .filter(f -> f.isAnnotationPresent(Id.class))
-                .findFirst()
-                .orElseThrow();
+    public List<T> readAll(Class<?> cls) throws Exception {
+        Container classData = readClassData(cls);
+        Field[] declaredFields = classData.getDeclaredFields();
+        Field primaryKey = classData.getPrimaryKey();
+        String tableName = classData.getTableName();
 
-        String tableName = cls.getAnnotation(Table.class).name();
         String sql = String.format(Constants.SELECT_ALL_QUERY, tableName);
-
-        PreparedStatement stmt = connection.prepareStatement(sql);
-
-        ResultSet rs = stmt.executeQuery();
+        PreparedStatement statement = connection.prepareStatement(sql);
+        ResultSet rs = statement.executeQuery();
         rs.next();
 
         List<T> tList = new ArrayList<>();
@@ -209,20 +203,16 @@ public class ORM<T> {
         return tList;
     }
 
-    public void delete(T t, int l) throws Exception {
-        Class<?> cls = (Class<?>) t;
-        Field[] declaredFields = cls.getDeclaredFields();
-        Field primaryKey = Arrays.stream(declaredFields)
-                .filter(f -> f.isAnnotationPresent(Id.class))
-                .findFirst()
-                .orElseThrow();
+    public void delete(Class<?> cls, int l) throws Exception {
+        Container classData = readClassData(cls);
+        Field primaryKey = classData.getPrimaryKey();
+        String tableName = classData.getTableName();
 
-        String tableName = cls.getAnnotation(Table.class).name();
         String sql = String.format(Constants.DELETE_QUERY,
                 tableName, primaryKey.getName(), l);
 
-        PreparedStatement stmt = connection.prepareStatement(sql);
-        stmt.executeUpdate();
+        PreparedStatement statement = connection.prepareStatement(sql);
+        statement.executeUpdate();
     }
 
     @SuppressWarnings("all")
@@ -260,6 +250,17 @@ public class ORM<T> {
         ResultSet rs = getPrimaryKey.executeQuery();
         rs.next();
         return rs.getInt(1);
+    }
+
+    private Container readClassData(Class<?> cls) {
+        Field[] declaredFields = cls.getDeclaredFields();
+        Field primaryKey = Arrays.stream(declaredFields)
+                .filter(f -> f.isAnnotationPresent(Id.class))
+                .findFirst()
+                .orElseThrow();
+
+        String tableName = cls.getAnnotation(Table.class).name();
+        return new Container(cls, declaredFields, primaryKey, tableName);
     }
 
     private static MysqlDataSource getDataSource() throws IOException {
