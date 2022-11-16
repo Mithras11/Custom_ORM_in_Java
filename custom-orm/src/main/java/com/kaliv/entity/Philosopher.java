@@ -26,6 +26,7 @@ public class Philosopher {
         this.school = school;
     }
 
+    //needed for creating new instance through reflection
     public Philosopher() {
     }
 

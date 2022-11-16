@@ -10,10 +10,11 @@ import java.util.Set;
 @SuppressWarnings("all")
 public class Main {
     public static void main(String[] args) throws Exception {
-        Philosopher socrates = new Philosopher("Socrates", "Greek", "Athens");
-        Philosopher plato = new Philosopher("Plato", "Greek", "Athens");
-        Philosopher aristotle = new Philosopher("Aristotle", "Greek", "Athens");
-        Philosopher pythagoras = new Philosopher("Pythagoras", "Greek", "Crotone");
+        //setting test data
+        final Philosopher socrates = new Philosopher("Socrates", "Greek", "Athens");
+        final Philosopher plato = new Philosopher("Plato", "Greek", "Athens");
+        final Philosopher aristotle = new Philosopher("Aristotle", "Greek", "Athens");
+        final Philosopher pythagoras = new Philosopher("Pythagoras", "Greek", "Crotone");
 
         ORM<Object> orm = ORM.getConnection();
 
@@ -21,26 +22,35 @@ public class Main {
         Set<Class<?>> classes = scanner.findClasses();
         orm.createTable(classes);
 
+        //seed database
         orm.write(socrates);
         orm.write(plato);
         orm.write(aristotle);
         orm.write(pythagoras);
 
+        //test read method
         Philosopher aristotle_from_db = (Philosopher) orm.read(Philosopher.class, 3);
         System.out.println(aristotle_from_db);
         System.out.println("=============");
 
-        aristotle.setSchool("Stagira");
-        orm.update(aristotle, 3);
+        //test update method
+        final Philosopher updated_aristotle=new Philosopher(
+                aristotle.getName(),
+                aristotle.getNationality(),
+                "Stagira"
+        );
+        orm.update(updated_aristotle, 3);
 
         Philosopher updated_aristotle_from_db = (Philosopher) orm.read(Philosopher.class, 3);
         System.out.println(updated_aristotle_from_db);
         System.out.println("=============");
 
+        //test readAll method
         List<Philosopher> result = (List<Philosopher>) (List<?>) orm.readAll(Philosopher.class);
         result.stream().forEach(e -> System.out.println(e));
         System.out.println("=============");
 
+        //test delete method
         orm.delete(Philosopher.class, 1);
         List<Philosopher> updatedRsult = (List<Philosopher>) (List<?>) orm.readAll(Philosopher.class);
         updatedRsult.stream().forEach(e -> System.out.println(e));

@@ -32,9 +32,9 @@ public class ORM<T> {
         this.connection = dataSource.getConnection();
     }
 
-    public void createTable(Set<Class<?>> classes) throws SQLException {
-        for (Class<?> cls : classes) {
-            Container classData = readClassData(cls);
+    public void createTable(final Set<Class<?>> classes) throws SQLException {
+        for (Class<?> clazz : classes) {
+            Container classData = readClassData(clazz);
             Field[] declaredFields = classData.getDeclaredFields();
             Field primaryKey = classData.getPrimaryKey();
             String tableName = classData.getTableName();
@@ -71,17 +71,17 @@ public class ORM<T> {
         }
     }
 
-    public void dropTable(T t) throws SQLException {
-        Class<?> cls = (Class<?>) t;
-        String tableName = cls.getAnnotation(Table.class).name();
+    public void dropTable(final T t) throws SQLException {
+        Class<?> clazz = (Class<?>) t;
+        String tableName = clazz.getAnnotation(Table.class).name();
         String sql = String.format(Constants.DROP_TABLE_QUERY, tableName);
         PreparedStatement statement = connection.prepareStatement(sql);
         statement.executeUpdate();
     }
 
-    public void write(T t) throws Exception {
-        Class<?> cls = t.getClass();
-        Field[] declaredFields = cls.getDeclaredFields();
+    public void write(final T t) throws Exception {
+        Class<?> clazz = t.getClass();
+        Field[] declaredFields = clazz.getDeclaredFields();
 
         Field primaryKey = null;
         ArrayList<Field> columns = new ArrayList<>();
@@ -102,7 +102,7 @@ public class ORM<T> {
                 .collect(Collectors.joining(Constants.DELIMITER));
 
         String sql = String.format(Constants.INSERT_QUERY,
-                cls.getAnnotation(Table.class).name(),
+                clazz.getAnnotation(Table.class).name(),
                 Objects.requireNonNull(primaryKey).getName(),
                 joiner,
                 qMarks);
@@ -110,8 +110,8 @@ public class ORM<T> {
         PreparedStatement statement = connection.prepareStatement(sql);
 
         int index = 1;
-        int pkInDb = getPrimaryKeyFromDb(cls);
-        String tableName = cls.getAnnotation(Table.class).name();
+        int pkInDb = getPrimaryKeyFromDb(clazz);
+        String tableName = clazz.getAnnotation(Table.class).name();
         if (primaryKey.getType() == int.class) {
             pkInDb++;
             statement.setInt(index++, pkInDb);
@@ -129,9 +129,9 @@ public class ORM<T> {
         statement.executeUpdate();
     }
 
-    public void update(T t, int id) throws Exception {
-        Class<?> cls = t.getClass();
-        Field[] declaredFields = cls.getDeclaredFields();
+    public void update(final T t, final int id) throws Exception {
+        Class<?> clazz = t.getClass();
+        Field[] declaredFields = clazz.getDeclaredFields();
 
         Field primaryKey = null;
         StringJoiner joiner = new StringJoiner(Constants.DELIMITER);
@@ -158,7 +158,7 @@ public class ORM<T> {
         }
 
         String sql = String.format(Constants.UPDATE_QUERY,
-                cls.getAnnotation(Table.class).name(),
+                clazz.getAnnotation(Table.class).name(),
                 joiner,
                 Objects.requireNonNull(primaryKey).getName(),
                 id);
@@ -167,8 +167,8 @@ public class ORM<T> {
         statement.executeUpdate();
     }
 
-    public T read(Class<?> cls, int id) throws Exception {
-        Container classData = readClassData(cls);
+    public T read(final Class<?> clazz, final int id) throws Exception {
+        Container classData = readClassData(clazz);
         Field[] declaredFields = classData.getDeclaredFields();
         Field primaryKey = classData.getPrimaryKey();
         String tableName = classData.getTableName();
@@ -180,11 +180,11 @@ public class ORM<T> {
         ResultSet rs = statement.executeQuery();
         rs.next();
 
-        return readEntityFromDb(cls, declaredFields, primaryKey, rs);
+        return readEntityFromDb(clazz, declaredFields, primaryKey, rs);
     }
 
-    public List<T> readAll(Class<?> cls) throws Exception {
-        Container classData = readClassData(cls);
+    public List<T> readAll(final Class<?> clazz) throws Exception {
+        Container classData = readClassData(clazz);
         Field[] declaredFields = classData.getDeclaredFields();
         Field primaryKey = classData.getPrimaryKey();
         String tableName = classData.getTableName();
@@ -196,15 +196,15 @@ public class ORM<T> {
 
         List<T> tList = new ArrayList<>();
         while (!rs.isAfterLast()) {
-            T entity = readEntityFromDb(cls, declaredFields, primaryKey, rs);
+            T entity = readEntityFromDb(clazz, declaredFields, primaryKey, rs);
             tList.add(entity);
             rs.next();
         }
         return tList;
     }
 
-    public void delete(Class<?> cls, int l) throws Exception {
-        Container classData = readClassData(cls);
+    public void delete(final Class<?> clazz, final int l) throws Exception {
+        Container classData = readClassData(clazz);
         Field primaryKey = classData.getPrimaryKey();
         String tableName = classData.getTableName();
 
@@ -216,10 +216,10 @@ public class ORM<T> {
     }
 
     @SuppressWarnings("all")
-    private T readEntityFromDb(Class<?> tClass,
-                               Field[] declaredFields,
-                               Field primaryKey,
-                               ResultSet rs) throws Exception {
+    private T readEntityFromDb(final Class<?> tClass,
+                               final Field[] declaredFields,
+                               final Field primaryKey,
+                               final ResultSet rs) throws Exception {
         T t = (T) tClass.getConstructor().newInstance();
         int id = rs.getInt(primaryKey.getName());
         primaryKey.setAccessible(true);
@@ -239,8 +239,8 @@ public class ORM<T> {
         return t;
     }
 
-    private int getPrimaryKeyFromDb(Class<?> cls) throws SQLException {
-        String tableName = cls.getAnnotation(Table.class).name();
+    private int getPrimaryKeyFromDb(final Class<?> clazz) throws SQLException {
+        String tableName = clazz.getAnnotation(Table.class).name();
         if (primaryKeysInDb.containsKey(tableName)) {
             return primaryKeysInDb.get(tableName);
         }
@@ -252,15 +252,15 @@ public class ORM<T> {
         return rs.getInt(1);
     }
 
-    private Container readClassData(Class<?> cls) {
-        Field[] declaredFields = cls.getDeclaredFields();
+    private Container readClassData(final Class<?> clazz) {
+        Field[] declaredFields = clazz.getDeclaredFields();
         Field primaryKey = Arrays.stream(declaredFields)
                 .filter(f -> f.isAnnotationPresent(Id.class))
                 .findFirst()
                 .orElseThrow();
 
-        String tableName = cls.getAnnotation(Table.class).name();
-        return new Container(cls, declaredFields, primaryKey, tableName);
+        String tableName = clazz.getAnnotation(Table.class).name();
+        return new Container(declaredFields, primaryKey, tableName);
     }
 
     private static MysqlDataSource getDataSource() throws IOException {
